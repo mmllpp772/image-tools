@@ -97,9 +97,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .toolhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 
 /* video mosaic — scoped */
-#mosaic{--stage:#0d0f12;--ok:#1d7a47;--warn:#a15c00;--accent-soft:#f9e3d6}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #mosaic{--stage:#000;--ok:#5ccf8e;--warn:#f0b35a;--accent-soft:#3a2416}}
-:root[data-theme="dark"] #mosaic{--stage:#000;--ok:#5ccf8e;--warn:#f0b35a;--accent-soft:#3a2416}
+#mosaic{--stage:#0d0f12;--ok:#1d7a47;--warn:#a15c00;--gap:#c9cdd4;--accent-soft:#f9e3d6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #mosaic{--stage:#000;--ok:#5ccf8e;--warn:#f0b35a;--gap:#3a3f48;--accent-soft:#3a2416}}
+:root[data-theme="dark"] #mosaic{--stage:#000;--ok:#5ccf8e;--warn:#f0b35a;--gap:#3a3f48;--accent-soft:#3a2416}
 #mosaic .pick{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;border:1.5px dashed var(--line);border-radius:12px;background:var(--surface);cursor:pointer;font-weight:700;color:var(--accent);padding:10px 14px;text-align:center}
 #mosaic .pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 #mosaic .pick input{position:absolute;opacity:0;width:1px;height:1px}
@@ -135,6 +135,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #mosaic .chk{display:flex;gap:8px;align-items:flex-start;font-size:13px}
 #mosaic .chk small{display:block;color:var(--muted)}
 #mosaic .tips{font-size:13px;color:var(--muted);margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+#mosaic .cov{display:flex;flex-direction:column;gap:6px}
+#mosaic .cov canvas{width:100%;height:28px;border-radius:6px;cursor:pointer;display:block;background:var(--gap)}
+#mosaic .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+#mosaic .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 /* GoPro shrink — scoped */
 #gopro {
   --bg: #ECEFEE;
@@ -548,7 +552,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </section>
 
   <section id="mosaic" class="tool" hidden>
-    <p class="hint">選一支影片，自動追蹤畫面裡的臉並打上馬賽克，處理完存成新影片。</p>
+    <p class="hint">選一支影片，逐格找出畫面裡的臉並打碼，處理完存成新影片。</p>
     <label class="pick" id="mz-pickLbl"><input type="file" id="mz-file" accept="video/*"><span id="mz-pickTxt">選擇影片</span></label>
     <div class="meta" id="mz-meta" hidden></div>
 
@@ -559,10 +563,21 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <div id="mz-status">正在準備臉部偵測…</div>
     </div>
 
+    <div class="cov" id="mz-covBox" hidden>
+      <canvas id="mz-covBar" height="28"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>有蓋到臉</span>
+        <span><i style="background:var(--warn)"></i>抓不到臉，整個畫面打碼</span>
+        <span><i style="background:var(--gap)"></i>沒偵測到臉</span>
+        <span>點條狀圖可以跳到那個時間檢查</span>
+      </div>
+    </div>
+
     <div class="btns">
+      <button id="mz-btnAnalyze" class="full" disabled>① 逐格分析臉部</button>
       <button id="mz-btnPreview" disabled>▶ 預覽</button>
       <button id="mz-btnStop" disabled>■ 停止</button>
-      <button id="mz-btnExport" class="primary full" disabled>開始處理並匯出</button>
+      <button id="mz-btnExport" class="primary full" disabled>② 匯出影片</button>
     </div>
 
     <div class="result" id="mz-result" hidden>
@@ -577,6 +592,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <div class="grid">
         <label class="f"><span>偵測模式</span>
           <select id="mz-model"><option value="ssd">精準（建議）</option><option value="tiny">快速（舊手機用）</option></select></label>
+        <label class="f"><span>分析密度</span>
+          <select id="mz-rate"><option value="30">每秒 30 次（最不會漏）</option><option value="15">每秒 15 次</option><option value="10">每秒 10 次（最快）</option></select></label>
         <label class="f"><span>效果</span>
           <select id="mz-effect"><option value="black" selected>黑塊（最安全）</option><option value="mosaic">馬賽克</option><option value="blur">模糊</option></select></label>
         <label class="f"><span>形狀</span>
@@ -584,15 +601,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <label class="f"><span>馬賽克格數 <b id="mz-blockV"></b></span><input type="range" id="mz-block" min="3" max="25" value="5"></label>
         <label class="f"><span>範圍外擴 <b id="mz-padV"></b></span><input type="range" id="mz-pad" min="0" max="100" value="60"></label>
         <label class="f"><span>偵測門檻 <b id="mz-confV"></b></span><input type="range" id="mz-conf" min="15" max="90" value="30"></label>
-        <label class="f"><span>臉暫時沒偵測到時保留 <b id="mz-holdV"></b></span><input type="range" id="mz-hold" min="0" max="30" value="15"></label>
-        <label class="chk"><input type="checkbox" id="mz-small"><span>加強偵測遠處的小臉<small>畫面切四塊多偵測幾次，會比較慢</small></span></label>
+        <label class="f"><span>兩次抓到臉之間，空檔多久內自動補上 <b id="mz-gapV"></b></span><input type="range" id="mz-gap" min="0" max="50" value="30"></label>
+        <label class="f"><span>臉出現前、消失後多蓋 <b id="mz-holdV"></b></span><input type="range" id="mz-hold" min="0" max="30" value="10"></label>
+        <label class="chk"><input type="checkbox" id="mz-fallback" checked><span>抓不到臉時，整個畫面打碼<small>在有出現過臉的片段之間，只要某一刻一張臉都沒抓到，就把整個畫面打成粗馬賽克。最保險，但動作很多的片段會整段糊掉。</small></span></label>
+        <label class="chk"><input type="checkbox" id="mz-small"><span>加強偵測遠處的小臉<small>畫面切四塊多偵測幾次，分析會慢很多</small></span></label>
         <label class="chk"><input type="checkbox" id="mz-sound" checked><span>處理時播放聲音<small>只影響你聽不聽得到，匯出的影片都會有聲音</small></span></label>
       </div>
     </details>
 
     <ul class="tips">
-      <li>匯出是一邊播放一邊錄，需要跟影片一樣長的時間。過程中請不要切換 App 或鎖螢幕。</li>
-      <li>側臉、低頭、被手遮住，或臉剛進畫面的一瞬間，有可能漏掉。有漏的話把「偵測門檻」調低、「範圍外擴」調大再匯出一次。</li>
+      <li>先按「逐格分析」：會一格一格檢查整支影片，動作很快、只在少數幾格露臉也比較抓得到。這一步比影片本身長，1 分鐘的影片大約要 2～5 分鐘。</li>
+      <li>分析時會同時看前後的畫面：兩次抓到臉之間的空檔會自動補上，臉剛進畫面前也會提早蓋住。</li>
+      <li>匯出是一邊播放一邊錄，需要跟影片一樣長的時間。分析和匯出時請不要切換 App 或鎖螢幕。</li>
       <li>第一次打開要下載偵測模型（約 6 MB），之後會快很多。</li>
     </ul>
     <video id="mz-v" playsinline preload="auto"></video>
@@ -4413,30 +4433,49 @@ const det = document.createElement("canvas"), dctx = det.getContext("2d");
 const tmp = document.createElement("canvas"), tctx = tmp.getContext("2d");
 const MAX_SIDE = 1920, DET_MAX = 960;
 const S = {};
-let ready = false, running = null, busy = false, recorder = null, chunks = [], outBlob = null, outName = "";
+let ready = false, running = null, recorder = null, chunks = [], outBlob = null, outName = "";
 let audioCtx = null, audioDest = null, monitor = null, wake = null, fileName = "video", hasVideo = false;
-let frames = 0, faceFrames = 0;
+let samples = null;      // [{t, dets:[box]}] from the frame-by-frame pass; null = not analyzed
+let tracks = [];         // [{pts:[{t,b}]}] linked from samples
+let span = null;         // [first, last] time any face was seen
+let stillDets = [];      // quick single-frame result before analysis
+let abortAnalyze = false;
 
 // ---------- settings ----------
 const label = {
   block: x => `${x} 格（${x <= 6 ? "粗" : x <= 12 ? "中" : "細"}）`,
-  pad: x => `${x}%`, conf: x => (x / 100).toFixed(2), hold: x => `${(x / 10).toFixed(1)} 秒`
+  pad: x => `${x}%`, conf: x => (x / 100).toFixed(2),
+  gap: x => `${(x / 10).toFixed(1)} 秒`, hold: x => `${(x / 10).toFixed(1)} 秒`
 };
-for (const k of ["block", "pad", "conf", "hold"]) {
+for (const k of Object.keys(label)) {
   const upd = () => { S[k] = +$(k).value; $(k + "V").textContent = label[k](S[k]); };
-  $(k).addEventListener("input", () => { upd(); if (k === "conf") stillSoon(); else repaint(); });
+  $(k).addEventListener("input", () => {
+    upd();
+    if (k === "conf") staleAnalysis();
+    else if (k === "gap" || k === "hold") { if (samples) { buildTracks(); drawCoverage(); } repaint(); }
+    else repaint();
+  });
   upd();
 }
 ["effect", "shape"].forEach(k => $(k).addEventListener("change", repaint));
-["model", "small"].forEach(k => $(k).addEventListener("change", stillSoon));
+$("fallback").addEventListener("change", () => { drawCoverage(); repaint(); });
+["model", "small", "rate"].forEach(k => $(k).addEventListener("change", staleAnalysis));
 $("sound").addEventListener("change", () => { if (monitor) monitor.gain.value = $("sound").checked ? 1 : 0; });
 
+function staleAnalysis() {
+  if (samples) { samples = null; tracks = []; span = null; $("covBox").hidden = true; status("偵測設定改了，請重新按「逐格分析臉部」。", true); }
+  setButtons(); stillSoon();
+}
 function status(t, warn) { $("status").textContent = t; $("status").className = warn ? "warn" : ""; }
-function fmtT(s) { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function fmtT(s) { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 function setButtons() {
   const ok = ready && hasVideo && !running;
-  $("btnPreview").disabled = !ok; $("btnExport").disabled = !ok;
-  $("btnStop").disabled = !running; $("file").disabled = running === "export";
+  $("btnAnalyze").disabled = !ok;
+  $("btnPreview").disabled = !ok || !samples;
+  $("btnExport").disabled = !ok;
+  $("btnStop").disabled = !running;
+  $("file").disabled = !!running;
+  $("btnAnalyze").textContent = samples ? "① 重新逐格分析" : "① 逐格分析臉部";
 }
 
 // ---------- model ----------
@@ -4447,9 +4486,9 @@ async function init() {
     await faceapi.tf.ready();
     await Promise.all([faceapi.nets.ssdMobilenetv1.loadFromUri("models"), faceapi.nets.tinyFaceDetector.loadFromUri("models")]);
     const c = document.createElement("canvas"); c.width = c.height = 64;
-    await faceapi.detectAllFaces(c, opts()); // warm up
+    await faceapi.detectAllFaces(c, opts());
     ready = true; setButtons();
-    status(hasVideo ? "準備好了。可以先預覽調整設定，再按「開始處理並匯出」。" : "準備好了，請選擇影片。");
+    status(hasVideo ? "準備好了。請按「逐格分析臉部」。" : "準備好了，請選擇影片。");
     if (hasVideo) still();
   } catch (e) { status("偵測模型載入失敗，請確認網路後重新整理頁面。（" + (e.message || e) + "）", true); }
 }
@@ -4460,7 +4499,7 @@ function opts() {
     : new faceapi.SsdMobilenetv1Options({ minConfidence: c, maxResults: 50 });
 }
 
-// ---------- detection (runs on a snapshot of the clean frame) ----------
+// ---------- detection on the clean snapshot ----------
 async function detectRegion(sx, sy, sw, sh) {
   const k = Math.min(1, DET_MAX / Math.max(sw, sh));
   det.width = Math.max(1, Math.round(sw * k)); det.height = Math.max(1, Math.round(sh * k));
@@ -4486,48 +4525,143 @@ async function detectAll() {
   return out;
 }
 
-// ---------- tracking: smooth, predict motion, keep briefly when missed ----------
-let tracks = [];
-const cx = b => b.x + b.w / 2, cy = b => b.y + b.h / 2;
-function iou(a, b) {
-  const iw = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
-  const ih = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-  const i = iw * ih, u = a.w * a.h + b.w * b.h - i; return u > 0 ? i / u : 0;
+// ---------- pass 1: frame-by-frame analysis ----------
+function seekTo(t) {
+  return new Promise(res => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    v.addEventListener("seeked", () => {
+      if (v.requestVideoFrameCallback) { v.requestVideoFrameCallback(() => fin()); setTimeout(fin, 120); }
+      else fin();
+    }, { once: true });
+    setTimeout(fin, 2000); // never hang if a browser skips "seeked"
+    v.currentTime = t;
+  });
 }
-function predicted(t, now) {
-  const dt = Math.min(0.4, Math.max(0, now - t.t));
-  const lim = t.b.w * 0.6;
-  const dx = Math.max(-lim, Math.min(lim, t.vx * dt)), dy = Math.max(-lim, Math.min(lim, t.vy * dt));
-  const grow = 1 + Math.min(0.5, Math.max(0, now - t.seen)) * 0.8; // grow while unseen, to stay covering
-  const w = t.b.w * grow, h = t.b.h * grow;
-  return { x: cx(t.b) + dx - w / 2, y: cy(t.b) + dy - h / 2, w, h };
-}
-function updateTracks(dets, now) {
-  const used = new Set();
-  for (const t of tracks) {
-    const p = predicted(t, now);
-    let best = 0.1, bi = -1;
-    dets.forEach((d, i) => { if (!used.has(i)) { const s = Math.max(iou(p, d), overlapSmall(p, d) > 0.6 ? 0.3 : 0); if (s > best) { best = s; bi = i; } } });
-    if (bi < 0) continue;
-    used.add(bi);
-    const d = dets[bi], dt = now - t.t, a = 0.7;
-    if (dt > 0.01 && dt < 1) {
-      t.vx = 0.5 * t.vx + 0.5 * (cx(d) - cx(t.b)) / dt;
-      t.vy = 0.5 * t.vy + 0.5 * (cy(d) - cy(t.b)) / dt;
-    }
-    t.b = { x: a * d.x + (1 - a) * t.b.x, y: a * d.y + (1 - a) * t.b.y, w: a * d.w + (1 - a) * t.b.w, h: a * d.h + (1 - a) * t.b.h };
-    t.t = t.seen = now;
+async function analyze() {
+  running = "analyze"; abortAnalyze = false; setButtons();
+  $("result").hidden = true;
+  try { wake = await navigator.wakeLock?.request("screen"); } catch {}
+  const step = 1 / +$("rate").value, dur = v.duration;
+  const out = [];
+  const t0 = performance.now();
+  for (let t = 0, i = 0; t < dur; t = ++i * step) {
+    if (abortAnalyze) break;
+    await seekTo(Math.min(t, Math.max(0, dur - 0.001)));
+    ctx.drawImage(v, 0, 0, cv.width, cv.height);
+    sctx.drawImage(cv, 0, 0);
+    const d = await detectAll();
+    out.push({ t: v.currentTime, dets: d });
+    // live feedback: outline what was found
+    ctx.lineWidth = Math.max(2, cv.width / 300); ctx.strokeStyle = "#7aa2ff";
+    d.forEach(b => ctx.strokeRect(b.x, b.y, b.w, b.h));
+    const frac = Math.min(1, t / dur), el = (performance.now() - t0) / 1000;
+    $("prog").value = frac;
+    const eta = frac > 0.02 ? el / frac - el : 0;
+    status(`逐格分析中 ${fmtT(t)} / ${fmtT(dur)}` + (eta ? `　約剩 ${eta > 90 ? Math.ceil(eta / 60) + " 分鐘" : Math.ceil(eta) + " 秒"}` : "") + "　請保持畫面開著");
   }
-  dets.forEach((d, i) => { if (!used.has(i)) tracks.push({ b: { ...d }, t: now, seen: now, vx: 0, vy: 0 }); });
-  tracks = tracks.filter(t => now - t.seen <= S.hold / 10 + 0.05);
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+  running = null;
+  if (abortAnalyze) { status("已停止分析。"); setButtons(); return false; }
+  samples = out; buildTracks(); drawCoverage();
+  $("covBox").hidden = false; $("prog").value = 1;
+  const hit = out.filter(s => s.dets.length).length;
+  status(`分析完成：${out.length} 格中有 ${hit} 格抓到臉。可以點下面的條狀圖檢查，或直接匯出。`);
+  setButtons();
+  await seekTo(0); repaint();
+  return true;
 }
-function boxesAt(now) { return tracks.filter(t => now - t.seen <= S.hold / 10 + 0.05).map(t => predicted(t, now)); }
 
-// ---------- cover a face ----------
+// ---------- link detections across time into tracks ----------
+const cx = b => b.x + b.w / 2, cy = b => b.y + b.h / 2;
+function buildTracks() {
+  tracks = []; span = null;
+  if (!samples) return;
+  const maxGap = Math.max(S.gap / 10, 0.15);
+  const live = [];
+  for (const s of samples) {
+    if (s.dets.length) span = span ? [span[0], s.t] : [s.t, s.t];
+    const used = new Set();
+    // greedy: closest center relative to face size; allow larger jumps for longer gaps (fast motion)
+    const cand = [];
+    live.forEach((tr, ti) => {
+      const last = tr.pts[tr.pts.length - 1], dt = s.t - last.t;
+      if (dt > maxGap) return;
+      s.dets.forEach((d, di) => {
+        const size = Math.max(last.b.w, last.b.h, d.w, d.h);
+        const dist = Math.hypot(cx(d) - cx(last.b), cy(d) - cy(last.b)) / size;
+        const scale = Math.max(d.w, last.b.w) / Math.max(1, Math.min(d.w, last.b.w));
+        const lim = 1.5 + dt * 8;
+        if (dist < lim && scale < 2.5) cand.push({ ti, di, c: dist });
+      });
+    });
+    cand.sort((a, b) => a.c - b.c);
+    const tu = new Set();
+    for (const c of cand) if (!tu.has(c.ti) && !used.has(c.di)) { tu.add(c.ti); used.add(c.di); live[c.ti].pts.push({ t: s.t, b: s.dets[c.di] }); }
+    s.dets.forEach((d, di) => { if (!used.has(di)) { const tr = { pts: [{ t: s.t, b: d }] }; live.push(tr); tracks.push(tr); } });
+    for (let i = live.length - 1; i >= 0; i--) if (s.t - live[i].pts[live[i].pts.length - 1].t > maxGap) live.splice(i, 1);
+  }
+}
+const union = (a, b) => { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }; };
+const grow = (b, g) => ({ x: cx(b) - b.w * g / 2, y: cy(b) - b.h * g / 2, w: b.w * g, h: b.h * g });
+const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, w: a.w + (b.w - a.w) * k, h: a.h + (b.h - a.h) * k });
+
+function boxesAt(t) {
+  if (!samples) return stillDets;
+  const hold = S.hold / 10, step = 1 / +$("rate").value, out = [];
+  for (const tr of tracks) {
+    const p = tr.pts, first = p[0], last = p[p.length - 1];
+    if (t < first.t - hold - step || t > last.t + hold + step) continue;
+    if (t <= first.t) { out.push(grow(first.b, 1 + 0.6 * Math.min(1, (first.t - t) / 0.5))); continue; }
+    if (t >= last.t) { out.push(grow(last.b, 1 + 0.6 * Math.min(1, (t - last.t) / 0.5))); continue; }
+    let lo = 0, hi = p.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (p[m].t <= t) lo = m; else hi = m; }
+    const a = p[lo], b = p[hi], gapT = b.t - a.t;
+    if (gapT <= step * 1.6) out.push(lerp(a.b, b.b, (t - a.t) / gapT));
+    else if (gapT <= 0.6) out.push(union(grow(a.b, 1.1), grow(b.b, 1.1)));          // missed a few frames: cover the whole path
+    else out.push(union(grow(lerp(a.b, b.b, (t - a.t) / gapT), 1.6), grow(t - a.t < b.t - t ? a.b : b.b, 1.2)));
+  }
+  return out;
+}
+function needsFallback(t, boxes) {
+  return $("fallback").checked && samples && span && boxes.length === 0 && t >= span[0] - 0.05 && t <= span[1] + 0.05;
+}
+
+// ---------- coverage strip ----------
+function drawCoverage() {
+  const c = $("covBar"); if (!samples || !v.duration) return;
+  const W = Math.max(200, Math.round(c.clientWidth * (window.devicePixelRatio || 1)));
+  c.width = W; c.height = 28;
+  const g = c.getContext("2d"), css = getComputedStyle(c);
+  const col = { a: css.getPropertyValue("--accent").trim(), w: css.getPropertyValue("--warn").trim(), g: css.getPropertyValue("--gap").trim() };
+  for (let x = 0; x < W; x++) {
+    const t = (x + 0.5) / W * v.duration, b = boxesAt(t);
+    g.fillStyle = b.length ? col.a : needsFallback(t, b) ? col.w : col.g;
+    g.fillRect(x, 0, 1, 28);
+  }
+}
+$("covBar").addEventListener("click", async e => {
+  if (running || !samples) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  await seekTo(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * v.duration);
+  repaint();
+  status(`目前位置 ${fmtT(v.currentTime)}。可以按「預覽」從這裡播放。`);
+});
+window.addEventListener("resize", () => drawCoverage());
+
+// ---------- cover ----------
+function pixelateRect(x1, y1, w, h, n) {
+  const sw = Math.max(1, Math.round(w >= h ? n : n * w / h)), sh = Math.max(1, Math.round(h >= w ? n : n * h / w));
+  tmp.width = sw; tmp.height = sh; tctx.imageSmoothingEnabled = true;
+  tctx.drawImage(cv, x1, y1, w, h, 0, 0, sw, sh);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tmp, 0, 0, sw, sh, x1, y1, w, h);
+  ctx.imageSmoothingEnabled = true;
+}
 function cover(b) {
   const W = cv.width, H = cv.height, p = S.pad / 100;
-  let x1 = Math.max(0, Math.floor(b.x - b.w * p)), x2 = Math.min(W, Math.ceil(b.x + b.w * (1 + p)));
-  let y1 = Math.max(0, Math.floor(b.y - b.h * p * 1.4)), y2 = Math.min(H, Math.ceil(b.y + b.h * (1 + p * 0.8)));
+  const x1 = Math.max(0, Math.floor(b.x - b.w * p)), x2 = Math.min(W, Math.ceil(b.x + b.w * (1 + p)));
+  const y1 = Math.max(0, Math.floor(b.y - b.h * p * 1.4)), y2 = Math.min(H, Math.ceil(b.y + b.h * (1 + p * 0.8)));
   const w = x2 - x1, h = y2 - y1;
   if (w < 2 || h < 2) return;
   ctx.save();
@@ -4540,55 +4674,36 @@ function cover(b) {
     tctx.drawImage(cv, x1, y1, w, h, 0, 0, sw, sh);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
     ctx.drawImage(tmp, 0, 0, sw, sh, x1, y1, w, h);
-  } else {
-    const n = S.block, sw = Math.max(1, Math.round(w >= h ? n : n * w / h)), sh = Math.max(1, Math.round(h >= w ? n : n * h / w));
-    tmp.width = sw; tmp.height = sh; tctx.imageSmoothingEnabled = true;
-    tctx.drawImage(cv, x1, y1, w, h, 0, 0, sw, sh);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, sw, sh, x1, y1, w, h);
-    ctx.imageSmoothingEnabled = true;
-  }
+  } else pixelateRect(x1, y1, w, h, S.block);
   ctx.restore();
 }
-
-function drawFrame(now, kickDetect) {
+function render(t) {
   ctx.drawImage(v, 0, 0, cv.width, cv.height);
-  if (kickDetect && ready && !busy) {
-    busy = true;
-    sctx.drawImage(cv, 0, 0); // clean copy before any mosaic is drawn
-    const t = now;
-    detectAll().then(d => updateTracks(d, t)).catch(() => {}).finally(() => { busy = false; });
-  }
-  const boxes = boxesAt(now);
-  boxes.forEach(cover);
-  return boxes.length;
+  const boxes = boxesAt(t);
+  if (needsFallback(t, boxes)) pixelateRect(0, 0, cv.width, cv.height, 12);
+  else boxes.forEach(cover);
 }
 
-// ---------- still frame (paused / seeking / settings change) ----------
+// ---------- still frame ----------
 let stillTimer = 0;
 async function still() {
   if (!ready || !hasVideo || running || v.readyState < 2) return;
-  ctx.drawImage(v, 0, 0, cv.width, cv.height);
-  sctx.drawImage(cv, 0, 0);
-  while (busy) await new Promise(r => setTimeout(r, 30));
-  busy = true;
-  try { tracks = []; updateTracks(await detectAll(), v.currentTime); } finally { busy = false; }
+  if (!samples) {
+    ctx.drawImage(v, 0, 0, cv.width, cv.height); sctx.drawImage(cv, 0, 0);
+    stillDets = await detectAll();
+  }
   repaint();
 }
 function stillSoon() { clearTimeout(stillTimer); stillTimer = setTimeout(still, 150); }
-function repaint() {
-  if (running || !hasVideo || v.readyState < 2) return;
-  ctx.drawImage(v, 0, 0, cv.width, cv.height);
-  boxesAt(v.currentTime).forEach(cover);
-}
+function repaint() { if (!running && hasVideo && v.readyState >= 2) render(v.currentTime); }
 
-// ---------- playback loop ----------
+// ---------- pass 2: playback render (preview / export) ----------
 function loop(_, meta) {
-  if (!running) return;
-  const now = meta && typeof meta.mediaTime === "number" ? meta.mediaTime : v.currentTime;
-  frames++; if (drawFrame(now, true)) faceFrames++;
+  if (running !== "preview" && running !== "export") return;
+  const t = meta && typeof meta.mediaTime === "number" ? meta.mediaTime : v.currentTime;
+  render(t);
   $("prog").value = v.currentTime / (v.duration || 1);
-  if (running === "export") status(`處理中 ${fmtT(v.currentTime)} / ${fmtT(v.duration)}　請保持畫面開著`);
+  if (running === "export") status(`匯出中 ${fmtT(v.currentTime)} / ${fmtT(v.duration)}　請保持畫面開著`);
   if (!v.paused && !v.ended) schedule();
 }
 function schedule() { if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(loop); else requestAnimationFrame(() => loop()); }
@@ -4601,16 +4716,13 @@ function ensureAudio() {
   monitor = audioCtx.createGain(); monitor.gain.value = $("sound").checked ? 1 : 0;
   src.connect(audioDest); src.connect(monitor); monitor.connect(audioCtx.destination);
 }
-function seekTo(t) { return new Promise(r => { v.addEventListener("seeked", r, { once: true }); v.currentTime = t; }); }
 
-async function start(mode) {
+async function play(mode) {
   try { ensureAudio(); await audioCtx.resume(); } catch {}
   if (mode === "export") {
+    if (!samples) { const ok = await analyze(); if (!ok) return; }
     $("result").hidden = true;
-    await seekTo(0);
-    ctx.drawImage(v, 0, 0, cv.width, cv.height); sctx.drawImage(cv, 0, 0);
-    while (busy) await new Promise(r => setTimeout(r, 30));
-    tracks = []; updateTracks(await detectAll(), 0);
+    await seekTo(0); render(0);
     const vt = cv.captureStream(30).getVideoTracks();
     const at = audioDest ? audioDest.stream.getAudioTracks() : [];
     const types = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
@@ -4622,24 +4734,21 @@ async function start(mode) {
     recorder.onstop = finish;
     recorder.start(1000);
     try { wake = await navigator.wakeLock?.request("screen"); } catch {}
-  } else {
-    if (v.ended) await seekTo(0);
-    tracks = [];
-  }
-  frames = faceFrames = 0;
+  } else if (v.ended || v.currentTime >= v.duration - 0.05) await seekTo(0);
   running = mode; setButtons();
   if (mode === "preview") status("預覽中…");
-  try { await v.play(); } catch (e) { status("無法播放這支影片：" + e.message, true); stop(); return; }
+  try { await v.play(); } catch (e) { status("無法播放這支影片：" + e.message, true); stop(true); return; }
   schedule();
 }
 
 function stop(cancelled) {
+  if (running === "analyze") { abortAnalyze = true; return; }
   const wasExport = running === "export";
   running = null; v.pause();
   if (wake) { wake.release().catch(() => {}); wake = null; }
   if (wasExport && recorder && recorder.state !== "inactive") { recorder._cancel = !!cancelled; recorder.stop(); }
   setButtons();
-  if (!wasExport) { status("已暫停。調整設定會套用在目前畫面上。"); still(); }
+  if (!wasExport) { status("已暫停。調整外觀設定會套用在目前畫面上。"); repaint(); }
 }
 
 function finish() {
@@ -4652,8 +4761,7 @@ function finish() {
   $("result").hidden = false;
   $("saveMsg").textContent = `${outName}・${(outBlob.size / 1048576).toFixed(1)} MB`;
   $("prog").value = 1;
-  const pct = frames ? Math.round(faceFrames / frames * 100) : 0;
-  status(`完成。約 ${pct}% 的畫面有偵測到臉。`);
+  status("匯出完成。");
   $("result").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -4677,18 +4785,18 @@ $("btnSave").onclick = async () => {
 };
 
 // ---------- events ----------
-v.addEventListener("ended", () => { if (running) stop(); });
-v.addEventListener("seeked", () => { if (!running) stillSoon(); });
-$("btnPreview").onclick = () => start("preview");
-$("btnExport").onclick = () => start("export");
+v.addEventListener("ended", () => { if (running === "preview" || running === "export") stop(); });
+$("btnAnalyze").onclick = async () => { try { ensureAudio(); } catch {} analyze(); };
+$("btnPreview").onclick = () => play("preview");
+$("btnExport").onclick = () => play("export");
 $("btnStop").onclick = () => stop(true);
 
 $("file").addEventListener("change", e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
-  if (running) stop(true);
   fileName = f.name.replace(/\.[^.]+$/, "") || "video";
   $("pickTxt").textContent = "換一支影片";
-  $("result").hidden = true; $("prog").value = 0; tracks = [];
+  $("result").hidden = true; $("covBox").hidden = true; $("prog").value = 0;
+  samples = null; tracks = []; span = null; stillDets = [];
   v.src = URL.createObjectURL(f);
   v.onloadedmetadata = () => {
     const k = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
@@ -4698,9 +4806,9 @@ $("file").addEventListener("change", e => {
     $("meta").textContent = `${f.name}　${v.videoWidth}×${v.videoHeight}　${fmtT(v.duration)}` + (k < 1 ? `　輸出 ${cv.width}×${cv.height}` : "");
     cv.hidden = false; $("ph").hidden = true; $("stage").classList.add("has");
     hasVideo = true; setButtons();
-    status(ready ? "可以先預覽調整設定，再按「開始處理並匯出」。" : "影片已載入，偵測模型還在準備中…");
+    status(ready ? "請按「逐格分析臉部」。" : "影片已載入，偵測模型還在準備中…");
   };
-  v.onloadeddata = () => { seekTo(Math.min(0.1, (v.duration || 1) / 2)); };
+  v.onloadeddata = async () => { await seekTo(Math.min(0.1, (v.duration || 1) / 2)); still(); };
   v.onerror = () => status("這支影片的格式瀏覽器打不開，請換一支試試。", true);
 });
 
